@@ -3,8 +3,8 @@
    Ativo: Torno Convencional TC-01
    -------------------------------------------------------------------------
    Fluxo principal:
-     MindAR reconhece o target  ->  âncoras 3D acompanham o torno
-     a cada quadro: posição 3D da âncora -> projeção na tela -> move o botão
+     MindAR reconhece o target  ->  a entidade #alvo acompanha o torno
+     a cada quadro: ponto do hotspot (local) -> mundo -> projeção na tela -> move o botão
      toque (pointerup) no hotspot -> painel estático OU fetch() na API Flask
    Valores de telemetria/manutenção são SIMULADOS (fins didáticos).
    ========================================================================= */
@@ -15,8 +15,8 @@ const { ID_EQUIPAMENTO, API_BASE, TIMEOUT_MS, INTERVALO_ATUALIZACAO_MS, DEBUG } 
    1. DEFINIÇÃO DOS HOTSPOTS
    posicao: coordenadas no espaço do target do MindAR.
      x: -0.5 (borda esquerda da imagem) ... +0.5 (borda direita)
-     y: metade da altura da imagem (proporção altura/largura). Ex.: foto 2:1 -> -0.25 ... +0.25
-     Ajuste os valores conforme a foto usada como target (use ?debug=1).
+     y: metade da altura da imagem (proporção altura/largura). Ex.: foto 640x480 -> -0.375 ... +0.375
+     Valores atuais calculados para a foto torno.jpg (640x480). Ajuste com ?debug=1.
    tipo: "estatico" -> conteúdo fica no frontend
          "api"      -> conteúdo vem da API Flask
    ------------------------------------------------------------------------- */
@@ -26,7 +26,7 @@ const HOTSPOTS = [
     titulo: "Cabeçote e Placa",
     rotulo: "Cabeçote",
     tipo: "estatico",
-    posicao: { x: -0.33, y: 0.07 },
+    posicao: { x: -0.24, y: 0.14 },
     conteudo: `
       <p>O <strong>cabeçote fixo</strong> abriga o eixo-árvore e a caixa de engrenagens que definem a
       rotação. Na ponta do eixo fica a <strong>placa universal de 3 castanhas</strong>, que prende e gira a peça.</p>
@@ -43,7 +43,7 @@ const HOTSPOTS = [
     titulo: "Carro e Porta-ferramenta",
     rotulo: "Carro",
     tipo: "estatico",
-    posicao: { x: 0.02, y: 0.0 },
+    posicao: { x: 0.07, y: 0.12 },
     conteudo: `
       <p>Conjunto que desloca a ferramenta de corte: <strong>carro longitudinal</strong> (desliza sobre o
       barramento), <strong>carro transversal</strong> e <strong>carro superior</strong> com o
@@ -60,7 +60,7 @@ const HOTSPOTS = [
     titulo: "Contraponto",
     rotulo: "Contraponto",
     tipo: "estatico",
-    posicao: { x: 0.31, y: 0.05 },
+    posicao: { x: 0.41, y: 0.12 },
     conteudo: `
       <p>Fica do lado oposto ao cabeçote e desliza sobre o barramento. Apoia peças longas com a
       <strong>ponta</strong> e também é usado para <strong>furar</strong> com mandril e broca.</p>
@@ -76,7 +76,7 @@ const HOTSPOTS = [
     titulo: "Proteção e Segurança",
     rotulo: "Segurança",
     tipo: "estatico",
-    posicao: { x: -0.18, y: 0.12 },
+    posicao: { x: -0.11, y: 0.19 },
     conteudo: `
       <p>A <strong>proteção da placa</strong> evita contato com partes girantes e projeção de cavacos.
       O <strong>botão de emergência</strong> interrompe imediatamente o movimento.</p>
@@ -94,7 +94,7 @@ const HOTSPOTS = [
     rotulo: "Manutenção",
     tipo: "api",
     endpoint: `/api/equipamentos/${ID_EQUIPAMENTO}/manutencao`,
-    posicao: { x: 0.12, y: -0.12 },
+    posicao: { x: 0.24, y: 0.04 },
   },
   {
     id: "monitoramento",
@@ -102,7 +102,7 @@ const HOTSPOTS = [
     rotulo: "Monitoramento",
     tipo: "api",
     endpoint: `/api/equipamentos/${ID_EQUIPAMENTO}/telemetria`,
-    posicao: { x: -0.37, y: -0.09 },
+    posicao: { x: -0.22, y: -0.03 },
     atualizaSozinho: true,
   },
 ];
@@ -130,19 +130,13 @@ let temporizador = null;     // atualização automática do monitoramento
 let ultimaTelemetria = null; // para destacar valores que mudaram
 
 /* -------------------------------------------------------------------------
-   3. CRIAÇÃO DOS HOTSPOTS (âncora 3D + botão no DOM)
+   3. CRIAÇÃO DOS BOTÕES DOS HOTSPOTS
    ------------------------------------------------------------------------- */
 HOTSPOTS.forEach((h, i) => {
   h.numero = i + 1;
 
-  // Âncora 3D: entidade vazia filha do target -> acompanha o tracking
-  const ancora = document.createElement("a-entity");
-  ancora.setAttribute("position", `${h.posicao.x} ${h.posicao.y} 0`);
-  alvo.appendChild(ancora);
-  h.ancora = ancora;
-
-  // Botão 2D que será reposicionado sobre a projeção da âncora
   const botao = document.createElement("button");
+  botao.type = "button";
   botao.className = `hotspot ${h.tipo === "api" ? "hotspot--api" : ""}`;
   botao.setAttribute("aria-label", h.titulo);
   botao.innerHTML = `
@@ -152,6 +146,7 @@ HOTSPOTS.forEach((h, i) => {
     }</span>`;
   // pointerup funciona igual para dedo, caneta e mouse
   botao.addEventListener("pointerup", (ev) => {
+    ev.preventDefault();
     ev.stopPropagation();
     abrirHotspot(h);
   });
@@ -160,26 +155,37 @@ HOTSPOTS.forEach((h, i) => {
 });
 
 /* -------------------------------------------------------------------------
-   4. PROJEÇÃO 3D -> TELA (roda a cada quadro)
+   4. PROJEÇÃO 3D -> 2D (roda a cada quadro)
+   Mesmo método do projeto de hotspots da aula:
+   ponto local do target -> mundo (localToWorld) -> tela (project)
    ------------------------------------------------------------------------- */
-const vetor = new THREE.Vector3();
+const cameraEl = document.getElementById("camera-ar");
 
 function posicionarHotspots() {
   requestAnimationFrame(posicionarHotspots);
-  if (!rastreando || !cena.camera || !cena.canvas) return;
+  if (!rastreando) return;
 
-  const camera = cena.camera;
-  const area = cena.canvas.getBoundingClientRect(); // o canvas pode ser maior que a tela (cover)
+  const camera = cameraEl.getObject3D("camera");
+  if (!camera || !alvo.object3D) return;
+
+  alvo.object3D.updateMatrixWorld(true);
+  camera.updateMatrixWorld(true);
 
   HOTSPOTS.forEach((h) => {
-    h.ancora.object3D.getWorldPosition(vetor); // posição 3D atual da âncora
-    vetor.project(camera);                      // -> coordenadas normalizadas (-1..1)
+    const pontoLocal = new THREE.Vector3(h.posicao.x, h.posicao.y, 0.03);
+    const pontoMundo = alvo.object3D.localToWorld(pontoLocal);
+    const projetado = pontoMundo.clone().project(camera); // -> coordenadas -1..1
 
-    const x = (vetor.x + 1) / 2 * area.width + area.left;
-    const y = (1 - vetor.y) / 2 * area.height + area.top;
-    const visivel = vetor.z < 1 && x > -40 && x < innerWidth + 40 && y > -40 && y < innerHeight + 40;
+    const x = (projetado.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (-projetado.y * 0.5 + 0.5) * window.innerHeight;
 
-    h.botao.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
+    h.botao.style.left = `${x}px`;
+    h.botao.style.top = `${y}px`;
+
+    const visivel =
+      projetado.z > -1 && projetado.z < 1 &&
+      x > -80 && x < window.innerWidth + 80 &&
+      y > -80 && y < window.innerHeight + 80;
     h.botao.classList.toggle("hotspot--oculto", !visivel);
   });
 }
@@ -400,6 +406,9 @@ function formatarData(iso) {
   const [a, m, d] = iso.split("-");
   return `${d}/${m}/${a}`;
 }
+
+/* Log útil para a demonstração */
+console.log(`[WebAR] Ativo ${ID_EQUIPAMENTO} | API: ${API_BASE}`);
 
 /* Log útil para a demonstração */
 console.log(`[WebAR] Ativo ${ID_EQUIPAMENTO} | API: ${API_BASE}`);
