@@ -1,0 +1,71 @@
+# Orquestração dos serviços do protótipo — Torno Convencional TC-01
+# Subir tudo:            docker compose up -d --build
+# Ver logs:              docker compose logs -f
+# Expor a API em HTTPS:  docker compose --profile tunel up -d
+
+services:
+
+  # 1) Broker MQTT — recebe a telemetria e entrega a quem assina
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: tc01-mqtt
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mqtt-dados:/mosquitto/data
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/broker/uptime' -C 1 -W 3"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # 2) API Flask — assina o MQTT e responde a WebAR por HTTP/JSON
+  api:
+    build: ./backend
+    container_name: tc01-api
+    ports:
+      - "5000:5000"
+    environment:
+      MQTT_HOST: mqtt
+      MQTT_PORT: "1883"
+      TZ: America/Sao_Paulo
+    depends_on:
+      mqtt:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/saude', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # 3) Simulador — faz o papel do gateway da máquina publicando dados fictícios
+  simulador:
+    build: ./simulator
+    container_name: tc01-simulador
+    environment:
+      MQTT_HOST: mqtt
+      ID_ATIVO: TC-01
+      INTERVALO_S: "5"
+      TZ: America/Sao_Paulo
+    depends_on:
+      mqtt:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 4) (Opcional) Túnel HTTPS para a API — necessário quando a WebAR está no
+  #    GitHub Pages (HTTPS) e precisa chamar a API (o navegador bloqueia HTTP).
+  #    O endereço https://xxxx.trycloudflare.com aparece em: docker compose logs tunel
+  tunel:
+    image: cloudflare/cloudflared:latest
+    container_name: tc01-tunel
+    command: tunnel --no-autoupdate --url http://api:5000
+    depends_on:
+      - api
+    profiles: ["tunel"]
+    restart: unless-stopped
+
+volumes:
+  mqtt-dados:
