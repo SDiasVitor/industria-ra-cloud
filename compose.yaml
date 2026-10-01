@@ -1,7 +1,7 @@
 # Orquestração dos serviços do protótipo — Torno Convencional TC-01
-# Subir tudo:            docker compose up -d --build
-# Ver logs:              docker compose logs -f
-# Expor a API em HTTPS:  docker compose --profile tunel up -d
+# Subir tudo:   docker compose up -d --build
+# Ver logs:     docker compose logs -f
+# WebAR local:  https://IP-DO-PC:8443   (celular no mesmo Wi-Fi)
 
 services:
 
@@ -55,13 +55,26 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # 4) (Opcional) Túnel HTTPS para a API — necessário quando a WebAR está no
-  #    GitHub Pages (HTTPS) e precisa chamar a API (o navegador bloqueia HTTP).
+  # 4) Servidor web local (Nginx + HTTPS autoassinado)
+  #    - entrega a WebAR (pasta frontend) em https://IP-DO-PC:8443
+  #    - encaminha /api/... para a API Flask (mesma origem: sem CORS e sem túnel)
+  web:
+    build: ./web
+    container_name: tc01-web
+    ports:
+      - "8443:443"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # 5) (Opcional) Túnel HTTPS com Cloudflare — precisa da porta 7844 liberada na rede.
   #    O endereço https://xxxx.trycloudflare.com aparece em: docker compose logs tunel
   tunel:
     image: cloudflare/cloudflared:latest
     container_name: tc01-tunel
-    command: tunnel --no-autoupdate --url http://api:5000
+    command: tunnel --no-autoupdate --protocol http2 --url http://api:5000
     depends_on:
       - api
     profiles: ["tunel"]

@@ -6,12 +6,7 @@ window.CONFIG = {
   // Identificador do ativo na API
   ID_EQUIPAMENTO: "TC-01",
 
-  // Endereço da API quando nenhum outro for informado.
-  // Ordem de prioridade (ver resolverApiBase abaixo):
-  //   1) ?api=https://endereco-da-api  na URL da página (fica salvo no aparelho)
-  //   2) endereço salvo anteriormente no aparelho
-  //   3) mesmo host da página, porta 5000 (teste local na rede)
-  //   4) API_PADRAO
+  // Endereço da API quando a página está no GitHub Pages e nenhum ?api= foi informado.
   API_PADRAO: "http://localhost:5000",
 
   // Tempo máximo de espera por uma resposta da API (ms)
@@ -21,6 +16,12 @@ window.CONFIG = {
   INTERVALO_ATUALIZACAO_MS: 5000,
 };
 
+/* Ordem de prioridade para descobrir o endereço da API:
+     1) ?api=https://endereco-da-api  na URL da página (fica salvo no aparelho)
+     2) endereço salvo anteriormente no aparelho
+     3) página servida pelo Nginx local (https://IP-DO-PC:8443) -> mesma origem,
+        pois o Nginx encaminha /api/... para a API Flask
+     4) API_PADRAO (página no GitHub Pages sem ?api=)                         */
 (function resolverApiBase() {
   const CHAVE = "tc01_api_base";
   const params = new URLSearchParams(window.location.search);
@@ -37,10 +38,8 @@ window.CONFIG = {
   }
 
   if (!base) {
-    const host = window.location.hostname;
-    const ehRedeLocal =
-      host === "localhost" || host === "127.0.0.1" || /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
-    base = ehRedeLocal ? `http://${host}:5000` : window.CONFIG.API_PADRAO;
+    const noGithubPages = window.location.hostname.endsWith("github.io");
+    base = noGithubPages ? window.CONFIG.API_PADRAO : window.location.origin;
   }
 
   window.CONFIG.API_BASE = base.replace(/\/+$/, ""); // remove barra final
