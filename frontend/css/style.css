@@ -20,29 +20,23 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-/* SEM cor de fundo no html e no body: o MindAR coloca o vídeo da câmera
-   atrás da página (z-index negativo) e qualquer fundo pode cobri-lo. */
-html {
-  height: 100%;
-  overflow: hidden;
-}
-
-body {
+/* Igual ao projeto de hotspots da aula (torno CNC), que funciona no celular:
+   sem cor de fundo no html/body, para não cobrir o vídeo da câmera. */
+html, body {
   margin: 0;
+  width: 100%;
   height: 100%;
   overflow: hidden;
-  background: transparent;
   color: var(--texto);
   font-family: var(--fonte);
 }
 
-/* A cena (modo embedded) ocupa a tela toda, atrás do HUD e dos hotspots */
+/* Cena A-Frame (modo embedded) ocupando a tela toda */
 a-scene {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  position: absolute !important;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 /* ---------------- HUD superior ---------------- */
@@ -104,7 +98,7 @@ a-scene {
 
 /* ---------------- Hotspots ---------------- */
 .camada-hotspots {
-  position: fixed; inset: 0; z-index: 10;
+  position: fixed; inset: 0; z-index: 40;
   pointer-events: none;
   opacity: 0; transition: opacity .2s;
 }
@@ -113,10 +107,11 @@ a-scene {
 
 .hotspot {
   position: absolute; top: 0; left: 0;
+  transform: translate(-50%, -50%);
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 6px; border: 0; background: none; color: var(--texto);
   font-family: var(--fonte); cursor: pointer;
-  will-change: transform;
+  touch-action: manipulation;
   pointer-events: none;
 }
 .hotspot--oculto { visibility: hidden; }
@@ -153,7 +148,7 @@ a-scene {
 
 /* ---------------- Painel inferior ---------------- */
 .painel {
-  position: fixed; z-index: 30;
+  position: fixed; z-index: 60;
   left: 0; right: 0; bottom: 0;
   max-height: 62vh;
   display: flex; flex-direction: column;
@@ -244,7 +239,7 @@ a-scene {
 
 /* Aviso geral */
 .aviso-geral {
-  position: fixed; z-index: 40; left: 16px; right: 16px; top: 50%;
+  position: fixed; z-index: 70; left: 16px; right: 16px; top: 50%;
   transform: translateY(-50%);
   background: var(--fundo-forte); border: 1px solid var(--vermelho);
   border-radius: var(--raio); padding: 16px; text-align: center;
