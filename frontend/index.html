@@ -2,41 +2,23 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>TC-01 · Manutenção em RA</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" />
-  <link rel="stylesheet" href="css/style.css?v=3" />
+  <link rel="stylesheet" href="css/style.css?v=5" />
 
-  <!-- A-Frame (motor 3D/WebXR) + MindAR (reconhecimento de imagem e tracking) -->
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <!-- A-Frame (motor 3D) + MindAR (reconhecimento de imagem e tracking) -->
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
-  <!-- Configuração (endereço da API, id do ativo) e lógica da aplicação -->
-  <script src="js/config.js?v=3"></script>
-  <script src="js/app.js?v=3" defer></script>
+  <!-- Configuração (endereço da API, id do ativo) -->
+  <script src="js/config.js?v=5"></script>
 </head>
 <body>
 
-  <!-- ===================== CENA DE REALIDADE AUMENTADA ===================== -->
-  <!-- uiScanning/uiLoading/uiError: no -> usamos nossa própria interface (HUD) -->
-  <a-scene
-    id="cena"
-    mindar-image="imageTargetSrc: assets/targets/torno.mind; maxTrack: 1; uiScanning: no; uiLoading: no; uiError: no; filterMinCF: 0.0001; filterBeta: 0.001"
-    color-space="sRGB"
-    renderer="colorManagement: true; physicallyCorrectLights: true"
-    vr-mode-ui="enabled: false"
-    device-orientation-permission-ui="enabled: false">
-
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-    <!-- Âncora do target: tudo que for filho dela acompanha o torno.
-         As âncoras dos hotspots são criadas pelo app.js a partir da lista HOTSPOTS. -->
-    <a-entity id="alvo" mindar-image-target="targetIndex: 0"></a-entity>
-  </a-scene>
-
-  <!-- ===================== HUD (interface por cima da câmera) ===================== -->
+  <!-- ===================== 1. HUD (interface por cima da câmera) ===================== -->
   <header class="hud">
     <div class="hud__ativo">
       <span class="hud__tag" id="hud-id">TC-01</span>
@@ -56,10 +38,11 @@
     <p>Enquadre a etiqueta visual do torno</p>
   </div>
 
-  <!-- Os botões dos hotspots são criados aqui pelo app.js e reposicionados a cada quadro -->
+  <!-- ===================== 2. Camada dos hotspots ===================== -->
+  <!-- Os botões são criados pelo app.js e reposicionados a cada quadro -->
   <div id="camada-hotspots" class="camada-hotspots"></div>
 
-  <!-- Painel de informações (abre ao tocar em um hotspot) -->
+  <!-- ===================== 3. Painel de informações ===================== -->
   <section class="painel" id="painel" aria-hidden="true" aria-live="polite">
     <div class="painel__alca"></div>
     <div class="painel__topo">
@@ -67,7 +50,7 @@
         <span class="painel__numero" id="painel-numero">1</span>
         <h2 id="painel-titulo">Título</h2>
       </div>
-      <button class="botao-icone" id="painel-fechar" aria-label="Fechar painel">✕</button>
+      <button class="botao-icone" id="painel-fechar" type="button" aria-label="Fechar painel">✕</button>
     </div>
     <div class="painel__conteudo" id="painel-conteudo"></div>
     <footer class="painel__rodape">
@@ -78,5 +61,7 @@
   <!-- Aviso de erro geral (câmera negada, arquivo .mind ausente etc.) -->
   <div class="aviso-geral" id="aviso-geral" hidden></div>
 
-</body>
-</html>
+  <!-- ===================== 4. Cena A-Frame / MindAR ===================== -->
+  <!-- Mesma configuração do projeto de hotspots feito em aula (embedded + alpha) -->
+  <a-scene
+    id="cena"
