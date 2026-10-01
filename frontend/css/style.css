@@ -36,6 +36,15 @@ body {
   font-family: var(--fonte);
 }
 
+/* A cena (modo embedded) ocupa a tela toda, atrás do HUD e dos hotspots */
+a-scene {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
 /* ---------------- HUD superior ---------------- */
 .hud {
   position: fixed;
