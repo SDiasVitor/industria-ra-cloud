@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TC-01 · Painel de Monitoramento</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" />
+
+  <!-- Mesma configuração da WebAR (descobre o endereço da API) -->
+  <script src="js/config.js?v=6"></script>
+
+  <style>
+    :root {
+      --fundo: #0f1215;
+      --cartao: #171b20;
+      --borda: #262c33;
+      --texto: #eef1f3;
+      --texto-suave: #8f9aa5;
+      --amarelo: #ffc400;
+      --ciano: #2ad4e8;
+      --verde: #3ddc84;
+      --vermelho: #ff5c5c;
+      --laranja: #ff9f1c;
+      --fonte: "Barlow", system-ui, sans-serif;
+      --mono: "JetBrains Mono", ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      background: var(--fundo); color: var(--texto);
+      font-family: var(--fonte);
+    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 20px 16px 40px; }
+
+    /* Cabeçalho */
+    header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .ativo { display: flex; align-items: center; gap: 12px; }
+    .tag { font-family: var(--mono); font-weight: 700; color: #111; background: var(--amarelo); padding: 8px 10px; border-radius: 8px; }
+    .ativo h1 { margin: 0; font-size: 1.4rem; }
+    .ativo small { color: var(--texto-suave); }
+    .conexoes { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: .72rem; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--borda); background: var(--cartao); }
+    .led { width: 8px; height: 8px; border-radius: 50%; background: var(--texto-suave); }
+    .ok .led { background: var(--verde); box-shadow: 0 0 8px var(--verde); }
+    .falha .led { background: var(--vermelho); }
+
+    .selo { display: inline-block; font-family: var(--mono); font-size: .68rem; letter-spacing: .08em; color: var(--amarelo); border: 1px dashed var(--amarelo); border-radius: 6px; padding: 4px 8px; margin-bottom: 14px; }
+
+    /* Aviso de indisponibilidade */
+    .aviso { display: none; gap: 12px; align-items: center; background: rgba(255,92,92,.12); border: 1px solid var(--vermelho); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+    .aviso.visivel { display: flex; }
+    .aviso strong { display: block; }
+    .aviso button { margin-left: auto; }
+
+    /* Cartões de métricas */
+    .metricas { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .cartao { background: var(--cartao); border: 1px solid var(--borda); border-radius: 14px; padding: 16px; }
+    .cartao .nome { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--texto-suave); }
+    .cartao .valor { font-family: var(--mono); font-weight: 700; font-size: 2rem; margin-top: 6px; }
+    .cartao .valor small { font-size: .8rem; color: var(--texto-suave); margin-left: 4px; }
+    .cartao.mudou { animation: destaque 1.2s ease-out; }
+    @keyframes destaque { 0% { border-color: var(--ciano); background: rgba(42,212,232,.18); } 100% { border-color: var(--borda); background: var(--cartao); } }
+
+    .status-valor { display: flex; align-items: center; gap: 8px; font-size: 1.5rem; font-weight: 700; margin-top: 8px; text-transform: capitalize; }
+    .status-valor .led { width: 12px; height: 12px; }
+    .status--operando .led { background: var(--verde); box-shadow: 0 0 10px var(--verde); }
+    .status--parado .led { background: var(--vermelho); }
+    .status--setup .led { background: var(--laranja); }
+
+    /* Gráficos e manutenção */
+    .grade { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+    @media (max-width: 800px) { .grade { grid-template-columns: 1fr; } }
+    h2 { font-size: .85rem; text-transform: uppercase; letter-spacing: .08em; color: var(--amarelo); margin: 0 0 12px; }
+    .grafico { margin-bottom: 14px; }
+    .grafico-topo { display: flex; justify-content: space-between; font-size: .8rem; color: var(--texto-suave); margin-bottom: 4px; }
+    svg { width: 100%; height: 110px; display: block; background: #12161a; border-radius: 10px; }
+
+    .datas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .datas div { background: #12161a; border-radius: 10px; padding: 10px; }
+    .datas span { display: block; font-size: .72rem; color: var(--texto-suave); }
+    .datas strong { font-family: var(--mono); }
+    ul { margin: 0 0 12px; padding-left: 18px; line-height: 1.5; }
+    .suave { color: var(--texto-suave); font-size: .85rem; }
+
+    /* Rodapé */
+    .rodape { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-top: 18px; font-size: .8rem; color: var(--texto-suave); }
+    .rodape code { font-family: var(--mono); word-break: break-all; }
+    button, .botao { font-family: var(--fonte); font-weight: 700; font-size: .9rem; color: #111; background: var(--amarelo); border: 0; border-radius: 10px; padding: 9px 14px; cursor: pointer; text-decoration: none; }
+    .botao--secundario { background: transparent; color: var(--texto); border: 1px solid var(--borda); }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Cabeçalho com identificação do ativo e estado das conexões -->
+    <header>
+      <div class="ativo">
+        <span class="tag" id="id-ativo">TC-01</span>
+        <div>
+          <h1 id="tipo-ativo">Torno Convencional</h1>
+          <small id="setor-ativo">Carregando identificação...</small>
+        </div>
+      </div>
+      <div class="conexoes">
+        <span class="chip" id="chip-api"><span class="led"></span> API</span>
+        <span class="chip" id="chip-mqtt"><span class="led"></span> MQTT</span>
+      </div>
+    </header>
+
+    <span class="selo">DADOS SIMULADOS · USO DIDÁTICO</span>
+
+    <!-- Mensagem exibida quando a API não responde (requisito RF09) -->
+    <div class="aviso" id="aviso">
+      <span style="font-size:1.6rem">⚠</span>
+      <div>
+        <strong>Não foi possível consultar os dados do equipamento.</strong>
+        <span class="suave">Verifique a disponibilidade do serviço e tente novamente.</span>
+      </div>
+      <button type="button" id="tentar">Tentar novamente</button>
+    </div>
+
+    <!-- Telemetria atual -->
+    <section class="metricas">
+      <div class="cartao" id="c-status">
+        <div class="nome">Status</div>
+        <div class="status-valor" id="v-status"><span class="led"></span><span>—</span></div>
+      </div>
+      <div class="cartao" id="c-temperatura">
+        <div class="nome">Temperatura</div>
+        <div class="valor"><span id="v-temperatura">—</span><small>°C</small></div>
+      </div>
+      <div class="cartao" id="c-vibracao">
+        <div class="nome">Vibração</div>
+        <div class="valor"><span id="v-vibracao">—</span><small>mm/s</small></div>
+      </div>
+      <div class="cartao" id="c-rpm">
+        <div class="nome">Rotação</div>
+        <div class="valor"><span id="v-rpm">—</span><small>rpm</small></div>
+      </div>
+      <div class="cartao">
+        <div class="nome">Última atualização</div>
+        <div class="valor" style="font-size:1.5rem"><span id="v-hora">—</span></div>
+        <div class="suave" id="v-idade"></div>
+      </div>
+    </section>
+
+    <div class="grade">
+      <!-- Histórico das últimas leituras (guardado só no navegador) -->
+      <section class="cartao">
+        <h2>Histórico recente</h2>
+        <div class="grafico">
+          <div class="grafico-topo"><span>Temperatura (°C)</span><span id="faixa-temp"></span></div>
+          <svg id="g-temp" viewBox="0 0 300 100" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="grafico">
+          <div class="grafico-topo"><span>Vibração (mm/s)</span><span id="faixa-vib"></span></div>
+          <svg id="g-vib" viewBox="0 0 300 100" preserveAspectRatio="none"></svg>
+        </div>
+        <p class="suave">Últimas 40 consultas. Atualização a cada 2 segundos.</p>
+      </section>
+
+      <!-- Dados de manutenção vindos da API -->
+      <section class="cartao">
+        <h2>Manutenção</h2>
+        <div id="manutencao"><p class="suave">Carregando...</p></div>
+      </section>
+    </div>
+
+    <div class="rodape">
+      <span>API: <code id="url-api"></code></span>
+      <div style="display:flex; gap:8px">
+        <button type="button" class="botao--secundario" id="pausar">Pausar</button>
+        <a class="botao" href="index.html">Abrir WebAR</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { ID_EQUIPAMENTO, API_BASE, TIMEOUT_MS } = window.CONFIG;
+    const INTERVALO_MS = 2000;   // frequência de consulta da telemetria
+    const MAX_PONTOS = 40;       // tamanho do histórico no gráfico
+
+    const historico = { temperatura: [], vibracao: [] };
+    let anterior = null;
+    let pausado = false;
+    let temporizador = null;
+
+    const $ = (id) => document.getElementById(id);
+    $("url-api").textContent = API_BASE;
+
+    /* ---------- Requisição HTTP com tempo limite ---------- */
+    async function buscarJSON(caminho) {
+      const controle = new AbortController();
+      const limite = setTimeout(() => controle.abort(), TIMEOUT_MS);
+      try {
+        const resposta = await fetch(API_BASE + caminho, { signal: controle.signal, cache: "no-store" });
+        if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
+        return await resposta.json();
+      } finally {
+        clearTimeout(limite);
+      }
+    }
+
+    function esc(valor) {
+      return String(valor ?? "—").replace(/[&<>"']/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    function chip(id, ok, texto) {
+      const el = $(id);
+      el.className = `chip ${ok ? "ok" : "falha"}`;
+      el.innerHTML = `<span class="led"></span> ${texto}`;
+    }
+
+    /* ---------- Identificação e manutenção (consultadas uma vez) ---------- */
+    async function carregarFixos() {
+      try {
+        const eq = await buscarJSON(`/api/equipamentos/${ID_EQUIPAMENTO}`);
+        $("id-ativo").textContent = eq.id;
+        $("tipo-ativo").textContent = eq.tipo;
+        $("setor-ativo").textContent = `${eq.setor} · ${eq.localizacao}`;
+
+        const m = await buscarJSON(`/api/equipamentos/${ID_EQUIPAMENTO}/manutencao`);
+        const data = (iso) => iso ? iso.split("-").reverse().join("/") : "—";
+        $("manutencao").innerHTML = `
+          <div class="datas">
+            <div><span>Última preventiva</span><strong>${data(m.ultima_preventiva)}</strong></div>
+            <div><span>Próxima preventiva</span><strong>${data(m.proxima_preventiva)}</strong></div>
+          </div>
+          <p class="suave">Responsável: ${esc(m.responsavel)}</p>
+          <ul>${(m.plano || []).map((p) => `<li>${esc(p)}</li>`).join("")}</ul>
+          <h2>Ordens de serviço</h2>
+          <ul>${(m.ordens_abertas || []).map((o) =>
+            `<li><strong>${esc(o.os)}</strong> — ${esc(o.descricao)} (${esc(o.prioridade)})</li>`).join("")
+            || "<li>Nenhuma ordem aberta</li>"}</ul>`;
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    /* ---------- Telemetria (consultada periodicamente) ---------- */
+    async function atualizarTelemetria() {
+      try {
+        const d = await buscarJSON(`/api/equipamentos/${ID_EQUIPAMENTO}/telemetria`);
+        $("aviso").classList.remove("visivel");
+        chip("chip-api", true, "API online");
+        chip("chip-mqtt", d.mqtt_conectado, d.mqtt_conectado ? "MQTT conectado" : "MQTT desconectado");
+
+        // Status
+        $("v-status").className = `status-valor status--${esc(d.status)}`;
+        $("v-status").innerHTML = `<span class="led"></span><span>${esc(d.status)}</span>`;
+
+        // Valores, destacando o que mudou desde a última consulta
+        [["temperatura", "c-temperatura"], ["vibracao", "c-vibracao"], ["rpm", "c-rpm"]].forEach(([campo, cartao]) => {
+          const valor = d[campo];
+          $(`v-${campo}`).textContent =
+            valor == null ? "—" : campo === "rpm" ? valor : Number(valor).toFixed(1);
+          if (anterior && anterior[campo] !== d[campo]) {
+            $(cartao).classList.remove("mudou");
+            void $(cartao).offsetWidth; // reinicia a animação
+            $(cartao).classList.add("mudou");
+          }
+        });
+        $("v-hora").textContent = d.atualizacao ?? "—";
+        $("v-idade").textContent = d.idade_segundos != null
+          ? `há ${Math.round(d.idade_segundos)} s${d.dado_antigo ? " · dado antigo" : ""}` : "";
+
+        // Histórico para os gráficos
+        if (d.temperatura != null) adicionar("temperatura", d.temperatura);
+        if (d.vibracao != null) adicionar("vibracao", d.vibracao);
+        desenhar("g-temp", historico.temperatura, "#ffc400", "faixa-temp");
+        desenhar("g-vib", historico.vibracao, "#2ad4e8", "faixa-vib");
+
+        anterior = d;
+      } catch (e) {
+        $("aviso").classList.add("visivel");
+        chip("chip-api", false, "API indisponível");
+        chip("chip-mqtt", false, "MQTT desconhecido");
+      }
+    }
+
+    function adicionar(campo, valor) {
+      historico[campo].push(valor);
+      if (historico[campo].length > MAX_PONTOS) historico[campo].shift();
+    }
+
+    /* ---------- Gráfico de linha simples em SVG ---------- */
+    function desenhar(idSvg, dados, cor, idFaixa) {
+      const svg = $(idSvg);
+      if (dados.length < 2) { svg.innerHTML = ""; return; }
+      const min = Math.min(...dados), max = Math.max(...dados);
+      const folga = (max - min) * 0.15 || 1;
+      const y = (v) => 95 - ((v - (min - folga)) / ((max + folga) - (min - folga))) * 90;
+      const x = (i) => (i / (MAX_PONTOS - 1)) * 300;
+      const pontos = dados.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+      const ultimo = dados.length - 1;
+      svg.innerHTML = `
+        <polyline points="${pontos}" fill="none" stroke="${cor}" stroke-width="2"
+                  vector-effect="non-scaling-stroke" stroke-linejoin="round" />
+        <circle cx="${x(ultimo)}" cy="${y(dados[ultimo])}" r="3" fill="${cor}" />`;
+      $(idFaixa).textContent = `mín ${min.toFixed(1)} · máx ${max.toFixed(1)}`;
+    }
+
+    /* ---------- Controles ---------- */
+    function iniciar() {
+      atualizarTelemetria();
+      temporizador = setInterval(atualizarTelemetria, INTERVALO_MS);
+    }
+
+    $("pausar").addEventListener("click", () => {
+      pausado = !pausado;
+      if (pausado) { clearInterval(temporizador); $("pausar").textContent = "Retomar"; }
+      else { iniciar(); $("pausar").textContent = "Pausar"; }
+    });
+
+    $("tentar").addEventListener("click", async () => {
+      await carregarFixos();
+      atualizarTelemetria();
+    });
+
+    // Recarrega identificação/manutenção quando a API volta a responder
+    setInterval(async () => {
+      if ($("setor-ativo").textContent.startsWith("Carregando") || $("manutencao").textContent.includes("Carregando")) {
+        await carregarFixos();
+      }
+    }, 5000);
+
+    carregarFixos();
+    iniciar();
+  </script>
+</body>
+</html>
